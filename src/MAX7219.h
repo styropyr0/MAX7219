@@ -38,6 +38,20 @@ enum class MAX7219DecodeMode : uint8_t
 };
 
 /**
+ * @enum MAX7219LEDColor
+ * @brief Enumeration for the LED color of the MAX7219
+ * @note This enumeration is used to specify the color of the LEDs when computing power dissipation.
+ */
+enum class MAX7219LEDColor
+{
+    Red,
+    Yellow,
+    Green,
+    Blue,
+    White
+};
+
+/**
  * @class MAX7219Settings
  * @brief Class to hold the settings for the MAX7219
  * @note This class encapsulates the various settings that can be configured for the MAX7219.
@@ -168,17 +182,24 @@ public:
 
     /**
      * @brief Computes the power dissipation of the MAX7219.
+     * @param vcc The supply voltage (V) to the MAX7219.
+     * @param ledColor The color of the LEDs being driven by the MAX7219, specified using the MAX7219LEDColor enumeration.
+     * @note This function calculates the power dissipation of the MAX7219 based on the supply voltage, the intensity setting, and the color of the LEDs. 
+     * The power dissipation is influenced by the forward voltage of the LEDs and the current drawn by the active segments.
+     * The function uses typical forward voltage values for different LED colors to estimate the power dissipation. The result is returned in watts (W).
      * @return The computed power dissipation in watts.
      */
-    float computePowerDissipation();
+    float computePowerDissipation(float vcc, MAX7219LEDColor ledColor);
 
 private:
     void writeSettings();
     void sendCommand(uint8_t command, uint8_t data);
     void setCS(bool state);
+    uint8_t getActivePixelCount();
 
     int _csPin = -1;
     uint8_t preset = MAX7219_NO_PRESETS;
+    uint8_t _displayBuffer[8] = {0};
     MAX7219Settings _settings = MAX7219Settings(MAX7219DecodeMode::None, 0x0A, 0x07, false, false);
     SPISettings _spiSettings = SPISettings(1000000, MSBFIRST, SPI_MODE0);
 };

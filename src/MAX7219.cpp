@@ -106,12 +106,41 @@ void MAX7219::setXY(uint8_t x, uint8_t y, bool state)
     sendCommand(MAX7219_DIGIT_START_REG + y, (state ? 0x01 : 0x00) << x);
 }
 
-float MAX7219::computePowerDissipation()
+float MAX7219::computePowerDissipation(float vcc, MAX7219LEDColor ledColor)
 {
-    float currentPerSegment = 0.0005;
-    float voltage = 5.0;
-    float totalCurrent = currentPerSegment * 8 * (_settings.scanLimit + 1);
-    return voltage * totalCurrent;
+    float duty = (2.0f * _settings.intensity + 1.0f) / 32.0f;
+    uint8_t activeSegments = getActivePixelCount();
+    float iSeg = 0.040f;
+
+    float vLed = 0.0f;
+    switch (ledColor)
+    {
+    case MAX7219LEDColor::Red:
+        vLed = 2.0f;
+        break;
+
+    case MAX7219LEDColor::Yellow:
+        vLed = 2.1f;
+        break;
+
+    case MAX7219LEDColor::Green:
+        vLed = 3.2f;
+        break;
+
+    case MAX7219LEDColor::Blue:
+        vLed = 3.3f;
+        break;
+
+    case MAX7219LEDColor::White:
+        vLed = 3.2f;
+        break;
+
+    default:
+        vLed = 2.0f;
+        break;
+    }
+
+    return (vcc * 0.008f) + ((vcc - vLed) * duty * iSeg * activeSegments);
 }
 
 void MAX7219::writeSettings()
@@ -125,6 +154,9 @@ void MAX7219::writeSettings()
 
 void MAX7219::sendCommand(uint8_t command, uint8_t data)
 {
+    if (command >= MAX7219_DIGIT_START_REG && command <= MAX7219_DIGIT_START_REG + 7)
+        _displayBuffer[command - MAX7219_DIGIT_START_REG] = data;
+
     SPI.beginTransaction(_spiSettings);
     setCS(true);
     SPI.transfer(command);
@@ -137,4 +169,19 @@ void MAX7219::setCS(bool state)
 {
     if (_csPin >= 0)
         digitalWrite(_csPin, state ? LOW : HIGH);
+}
+
+uint8_t MAX7219::getActivePixelCount()
+{
+    uint8_t count = 0;
+    for (uint8_t i = 0; i < 8; i++)
+    {
+        uint8_t columnData = _displayBuffer[i];
+        for (uint8_t j = 0; j < 8; j++)
+        {
+            if (columnData & (1 << j))
+                count++;
+        }
+    }
+    return count;
 }
