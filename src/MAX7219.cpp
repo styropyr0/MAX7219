@@ -11,7 +11,7 @@ void MAX7219::begin(uint8_t csPin)
     writeSettings();
 }
 
-void MAX7219::begin(uint8_t csPinSPISettings settings)
+void MAX7219::begin(uint8_t csPin, SPISettings settings)
 {
     _csPin = csPin;
     _spiSettings = settings;
@@ -20,20 +20,9 @@ void MAX7219::begin(uint8_t csPinSPISettings settings)
     writeSettings();
 }
 
-void MAX7219::begin()
+void MAX7219::setSettings(MAX7219Settings settings)
 {
-    writeSettings();
-}
-
-void MAX7219::begin(SPISettings settings)
-{
-    _spiSettings = settings;
-    writeSettings();
-}
-
-void MAX7219::setSettings(MAX7219Settings setting)
-{
-    _settings = setting;
+    _settings = settings;
     writeSettings();
 }
 
@@ -42,17 +31,17 @@ void MAX7219::setPreset(uint8_t preset)
     switch (preset)
     {
     case MAX7219_MATRIX_MODE:
-        _settings.decodeMode = MAX7219_DECODE_MODE_NONE;
+        _settings.decodeMode = MAX7219DecodeMode::None;
         _settings.scanLimit = 0x07;
         this->preset = MAX7219_MATRIX_MODE;
         break;
     case MAX7219_7SEG_MODE:
-        _settings.decodeMode = MAX7219_DECODE_MODE_CODEB;
+        _settings.decodeMode = MAX7219DecodeMode::AllDigits;
         _settings.scanLimit = 0x07;
         this->preset = MAX7219_7SEG_MODE;
         break;
     default:
-        _settings.decodeMode = MAX7219_DECODE_MODE_NONE;
+        _settings.decodeMode = MAX7219DecodeMode::None;
         _settings.intensity = 0x01;
         this->preset = MAX7219_NO_PRESETS;
         break;
@@ -78,10 +67,8 @@ void MAX7219::setScanLimit(uint8_t limit)
     writeSettings();
 }
 
-void MAX7219::setDecodeMode(uint8_t mode)
+void MAX7219::setDecodeMode(MAX7219DecodeMode mode)
 {
-    if (mode > 2)
-        return;
     _settings.decodeMode = mode;
     writeSettings();
 }
@@ -100,16 +87,16 @@ void MAX7219::clearDisplay()
 
 void MAX7219::setDigit(uint8_t digit, uint8_t value)
 {
-    if (digit > 7)
+    if (digit > 8 || digit < 1)
         return;
-    sendCommand(MAX7219_DIGIT_START_REG + digit, value);
+    sendCommand(MAX7219_DIGIT_START_REG + (digit - 1), value);
 }
 
 void MAX7219::setColumn(uint8_t column, uint8_t value)
 {
-    if (column > 7)
+    if (column > 8 || column < 1)
         return;
-    sendCommand(MAX7219_DIGIT_START_REG + column, value);
+    sendCommand(MAX7219_DIGIT_START_REG + (column - 1), value);
 }
 
 void MAX7219::setXY(uint8_t x, uint8_t y, bool state)
@@ -122,21 +109,21 @@ void MAX7219::setXY(uint8_t x, uint8_t y, bool state)
 float MAX7219::computePowerDissipation()
 {
     float currentPerSegment = 0.0005;
-    float voltage = 5.0;             
+    float voltage = 5.0;
     float totalCurrent = currentPerSegment * 8 * (_settings.scanLimit + 1);
     return voltage * totalCurrent;
 }
 
 void MAX7219::writeSettings()
 {
-    sendCommand(MAX7219_DECODE_MODE_REG, _settings.decodeMode);
+    sendCommand(MAX7219_DECODE_MODE_REG, static_cast<uint8_t>(_settings.decodeMode));
     sendCommand(MAX7219_INTENSITY_REG, _settings.intensity > 15 ? 15 : _settings.intensity);
     sendCommand(MAX7219_SCAN_LIMIT_REG, _settings.scanLimit > 7 ? 7 : _settings.scanLimit);
     sendCommand(MAX7219_SHUTDOWN_REG, _settings.shutdown ? 0x00 : 0x01);
     sendCommand(MAX7219_DISPLAY_TEST_REG, _settings.displayTest ? 0x01 : 0x00);
 }
 
-void sendCommand(uint8_t command, uint8_t data)
+void MAX7219::sendCommand(uint8_t command, uint8_t data)
 {
     SPI.beginTransaction(_spiSettings);
     setCS(true);
@@ -148,6 +135,6 @@ void sendCommand(uint8_t command, uint8_t data)
 
 void MAX7219::setCS(bool state)
 {
-    if (csPin != -1)
+    if (_csPin >= 0)
         digitalWrite(_csPin, state ? LOW : HIGH);
 }
